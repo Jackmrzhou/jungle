@@ -1,6 +1,12 @@
 package c.y.z
 package tokenizer
 
-import tokenizer.TokenType.TokenType
+sealed trait JgToken
 
-case class Token(tokenType: TokenType, raw: String)
+case object ADD extends JgToken
+case object SUB extends JgToken
+case object EQ extends JgToken
+case object MUL extends JgToken
+case object DIV extends JgToken
+case object EOF extends JgToken
+case class INT(value: Int) extends JgToken

@@ -11,15 +11,15 @@ class Tokenizer(charStream: InputStream){
   final val Delim = "(\\s)".r
 
   @tailrec
-  final def Next(): Token = {
+  final def Next(): JgToken = {
     val char = charStream.read()
     char match {
-      case -1 => hasNext = false; Token(tokenType = TokenType.EOF, "")
-      case '+' => Token(TokenType.Add, "+")
-      case '-' => Token(TokenType.Sub, "-")
-      case '=' => Token(TokenType.Eq, "=")
-      case '*' => Token(TokenType.Mul, "*")
-      case '/' => Token(TokenType.Div, "/")
+      case -1 => hasNext = false; EOF
+      case '+' => ADD
+      case '-' => SUB
+      case '=' => EQ
+      case '*' => MUL
+      case '/' => DIV
       case ' ' | '\t' | '\f' => Next()
       case '\n' | '\r' => line += 1; Next()
       case _ => {
@@ -38,7 +38,7 @@ class Tokenizer(charStream: InputStream){
           }
         }
         sb.toString() match {
-          case IntPattern(s) => Token(TokenType.Int, s)
+          case IntPattern(s) => INT(s.toInt)
           case default => throw new IllegalStateException(s"unrecognized identifier, id=$default")
         }
       }
