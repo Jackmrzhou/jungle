@@ -10,7 +10,7 @@ class TokenReader(tokens: Seq[JgToken]) extends Reader[JgToken]{
 
   override def rest: Reader[JgToken] = new TokenReader(tokens.tail)
 
-  override def pos: Position = NoPosition
+  override def pos: Position = tokens.headOption.map(_.pos).getOrElse(NoPosition)
 
   override def atEnd: Boolean = tokens.isEmpty
 }
