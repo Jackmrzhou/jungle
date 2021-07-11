@@ -20,6 +20,10 @@ case object DIV extends JgToken
 case object EOF extends JgToken
 case object LPAREN extends JgToken
 case object RPAREN extends JgToken
+case object LBRACKET extends JgToken
+case object RBRACKET extends JgToken
+case object LBRACE extends JgToken
+case object RBRACE extends JgToken
 case object COMMA extends JgToken
 case object COLONEQ extends JgToken
 case object COLON extends JgToken
@@ -77,3 +81,5 @@ case class ID(value: String) extends JgToken
 
 sealed trait KEYWORD extends JgToken
 case object VAR extends KEYWORD
+case object INT32TYPE extends KEYWORD
+case object FLOAT32TYPE extends KEYWORD

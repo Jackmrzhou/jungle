@@ -71,6 +71,10 @@ class Tokenizer(charStream: BufferedReader){
       case '(' => produce(LPAREN)
       case ')' => produce(RPAREN)
       case ',' => produce(COMMA)
+      case '[' => produce(LBRACKET)
+      case ']' => produce(RBRACKET)
+      case '{' => produce(LBRACE)
+      case '}' => produce(RBRACE)
       case ':' => {
         if(HasNext()) {
           getNextChar match {
@@ -113,6 +117,8 @@ class Tokenizer(charStream: BufferedReader){
         }
         sb.toString() match {
           case "var" => produce(VAR)
+          case "int32" => produce(INT32TYPE)
+          case "float32" => produce(FLOAT32TYPE)
           case id => produce(ID(id))
         }
       }

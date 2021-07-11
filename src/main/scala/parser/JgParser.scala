@@ -9,8 +9,8 @@ object JgParser extends Parsers {
   override type Elem = JgToken
 
   def literal: Parser[Literal] = accept("literal", {
-    case int @ INT(_) => Literal(int)
-    case float @ FLOAT(_) => Literal(float)
+    case int @ INT(_) => Literal(int, int32)
+    case float @ FLOAT(_) => Literal(float, float32)
   })
 
   def identifier: Parser[Identifier] = accept("identifier", {
@@ -45,9 +45,23 @@ object JgParser extends Parsers {
     case l ~ _ ~ r => AssignStatement(l, r)
   }
 
-  def typeName: Parser[TypeName] = identifier ^^ {i => TypeName(i)}
+  def jgType: Parser[Type] = typeName | sliceType
 
-  def fullDeclStatement: Parser[DeclStatement] = VAR ~ idList ~ opt(typeName) ~ opt(EQ ~ exprList) ^^ {
+  def typeLit: Parser[Type] = sliceType
+
+  def sliceType: Parser[Type] = LBRACKET ~ RBRACKET ~> jgType ^^ {t => SliceType(t)}
+
+  def builtinTypes: Parser[Type] = (INT32TYPE | FLOAT32TYPE) ^^ {
+    case INT32TYPE => int32
+    case FLOAT32TYPE => float32
+  }
+
+  def typeName: Parser[Type] = (builtinTypes | identifier) ^^ {
+    case id: Identifier => TypeName(id)
+    case t: Type => t
+  }
+
+  def fullDeclStatement: Parser[DeclStatement] = VAR ~ idList ~ opt(jgType) ~ opt(EQ ~ exprList) ^^ {
     case _ ~ ids ~ t ~ init => DeclStatement(ids, t, init.map(_._2))
   }
 
