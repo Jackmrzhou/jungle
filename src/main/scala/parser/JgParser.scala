@@ -2,6 +2,7 @@ package c.y.z
 package parser
 
 import c.y.z.tokenizer._
+import c.y.z.utils.Logger
 
 import scala.util.parsing.combinator.{PackratParsers, Parsers}
 
@@ -11,6 +12,7 @@ object JgParser extends Parsers {
   def literal: Parser[Literal] = accept("literal", {
     case int @ INT(_) => Literal(int, int32)
     case float @ FLOAT(_) => Literal(float, float32)
+    case s @ STRING(_) => Literal(s, string)
   })
 
   def identifier: Parser[Identifier] = accept("identifier", {
@@ -27,7 +29,13 @@ object JgParser extends Parsers {
     }
   }
 
-  def binaryExpr: Parser[Expression] = term ~ rep1((ADD | SUB) ~ term) ^^ {
+  def arithExpr: Parser[Expression] = term ~ rep((ADD | SUB) ~ term) ^^ {
+    case l ~ r => r.foldLeft(l) {
+        case (l, op ~ r) => BinaryExpr(l, op, r)
+      }
+  }
+
+  def binaryExpr: Parser[Expression] = arithExpr ~ rep((EQEQ | NOTEQ) ~ arithExpr) ^^ {
     case l ~ r => r.foldLeft(l) {
       case (l, op ~ r) => BinaryExpr(l, op, r)
     }
@@ -37,7 +45,9 @@ object JgParser extends Parsers {
 
   def primaryExpr: Parser[Expression] = operand
 
-  def expression: Parser[Expression] =  binaryExpr | term | primaryExpr
+  def expression: Parser[Expression] =  binaryExpr ^^ {
+    e => Logger.debug(s"Match expression: ${e}"); e
+  }
 
   def exprStatement: Parser[ExprStatement] = expression ^^ (expr => ExprStatement(expr))
 
@@ -69,21 +79,53 @@ object JgParser extends Parsers {
     case ids ~ _ ~ exprs => ShortDeclStmt(ids, exprs)
   }
 
-  def declStatement: Parser[Statement] = shortDeclStatement | fullDeclStatement
+  def simpleStatement: Parser[SimpleStatement] = shortDeclStatement | assignStatement | exprStatement ^^{
+    s => Logger.debug(s"Match simpleStatement: ${s}"); s
+  }
 
-  def statement: Parser[Statement] = declStatement | assignStatement | exprStatement
+  def statement: Parser[Statement] = forStmt | ifStmt | fullDeclStatement | simpleStatement
 
-  def statementList: Parser[JgAST] = rep1(statement) ^^ {
+  def statementList: Parser[StatementList] = rep1(statement) ^^ {
     s => StatementList(s.foldLeft(List[Statement]()) {
         case (l, s) => l :+ s
       })
   }
 
-  def program: Parser[JgAST] = phrase(statementList)
+  def blockStmt: Parser[BlockStmt] = LBRACE ~> opt(statementList) <~ RBRACE ^^ {
+    stmtList => Logger.debug(s"Match blockStmt: $stmtList"); BlockStmt(stmtList.getOrElse(StatementList(Nil)))
+  }
+
+  def ifStmt: Parser[IfStmt] = IF ~> expression ~ blockStmt ~ opt(ELSE ~> blockStmt) ^^ {
+    case expr ~ trueBlock ~ elseBlock => IfStmt(expr, trueBlock, elseBlock)
+  }
+
+  def rangeForClause: Parser[RangeForClause] = FOR ~> exprList ~ (EQ | COLONEQ) ~ RANGE ~ expression ^^ {
+    case exprs ~ op ~ _ ~ expr => RangeForClause(AssignStatement(exprs, ExprList(List(expr))), op == COLONEQ)
+  }
+
+  def trivialForClause1: Parser[TrivialForClause] =
+    FOR ~> (opt(simpleStatement) ~ SEMICOLON ~ opt(expression) ~ SEMICOLON ~ opt(simpleStatement)) ^^ {
+      case initStmt ~ _ ~ expr ~ _ ~ postStmt => Logger.debug("Match trivialForClause1"); TrivialForClause(initStmt, expr, postStmt)
+  }
+
+  def trivialForClause2: Parser[TrivialForClause] = FOR ~> opt(expression) ^^ {
+    expr => TrivialForClause(None, expr, None)
+  }
+
+  def forStmt: Parser[Statement] = (rangeForClause | trivialForClause1 | trivialForClause2) ~ blockStmt ^^ {
+    case clause ~ blockStmt => Logger.debug(s"Match ForStmt: $clause, $blockStmt") ;clause match {
+      case r: RangeForClause=> ForStmt(Right(r), blockStmt)
+      case l: TrivialForClause=> ForStmt(Left(l), blockStmt)
+    }
+  }
+
+  def program: Parser[Program] = opt(statementList) ~ opt(blockStmt) ^^ {
+    case stmtList ~ blockStmt => Program(stmtList, blockStmt)
+  }
 
   def apply(tokens: Seq[JgToken]) = {
     val reader = new TokenReader(tokens)
-    program(reader) match {
+    phrase(program)(reader) match {
       case Success(result, next) => Right(result)
       case Error(msg, next) => Left(msg)
     }

@@ -63,7 +63,18 @@ class Tokenizer(charStream: BufferedReader){
     cur match {
       case '+' => produce(ADD)
       case '-' => produce(SUB)
-      case '=' => produce(EQ)
+      case '=' => {
+        getNextChar match {
+          case '=' => produce(EQEQ)
+          case ch => putBack(ch); produce(EQ)
+        }
+      }
+      case '!' => {
+        getNextChar match {
+          case '=' => produce(NOTEQ)
+          case ch => putBack(ch); produce(EXCL)
+        }
+      }
       case '*' => produce(MUL)
       case '/' => produce(DIV)
       case ' ' | '\t' | '\f' => if (!HasNext()) EOF else Next()
@@ -75,6 +86,21 @@ class Tokenizer(charStream: BufferedReader){
       case ']' => produce(RBRACKET)
       case '{' => produce(LBRACE)
       case '}' => produce(RBRACE)
+      case ';' => produce(SEMICOLON)
+      case '"' => {
+        var skip = false
+        var needNext = true
+        val sb = new StringBuilder()
+        while (needNext && HasNext()) {
+          getNextChar match {
+            case '\\' => sb += '\\'; skip = true
+            case '"' => if (!skip) {needNext = false}; sb += '"'
+            case ch => sb += ch
+          }
+        }
+        if (needNext) throw new IllegalStateException(ErrorMsg(s"error parsing string, EOF"))
+        else produce(STRING(sb.toString()))
+      }
       case ':' => {
         if(HasNext()) {
           getNextChar match {
@@ -119,6 +145,10 @@ class Tokenizer(charStream: BufferedReader){
           case "var" => produce(VAR)
           case "int32" => produce(INT32TYPE)
           case "float32" => produce(FLOAT32TYPE)
+          case "if" => produce(IF)
+          case "else" => produce(ELSE)
+          case "range" => produce(RANGE)
+          case "for" => produce(FOR)
           case id => produce(ID(id))
         }
       }
